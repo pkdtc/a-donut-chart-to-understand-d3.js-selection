@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+</style>
+<body>
+<script type="text/javascript" src="https://d3js.org/d3.v4.min.js"></script>
+<script type="text/javascript">
+
+// let data = [
+// 	{
+// 		name : 'aa',
+// 		value : 123
+// 	},
+// 	{
+// 		name : 'bb',
+// 		value : 44
+// 	},
+// 	{
+// 		name : 'cc',
+// 		value : 14
+// 	},
+// 	{
+// 		name : 'dd',
+// 		value : 70
+// 	},
+// 	{
+// 		name : 'ee',
+// 		value : 92
+// 	}
+// ];
+let data2 = [123,44,14,70,92]
+let width = 960;
+let height = 500;
+let outerRadius = Math.min(width,height)/3;
+let innerRadius = outerRadius - 70;
+
+let color = d3.scaleOrdinal()
+	// .domain([20,50,80,110,140,170])
+	.range(["#98abc5", "#8a89a6", "#7b6888", "#6b486b", "#a05d56", "#d0743c", "#ff8c00"])
+
+let arc = d3.arc()
+	.outerRadius(outerRadius)
+	.innerRadius(innerRadius)
+
+let pie = d3.pie()
+	.sort(null)
+	.value((d,i) => d)
+
+let svg = d3.select('body').append('svg')
+	.attr('width',width)
+	.attr('height',height)
+	.append('g')
+	.attr('transform','translate('+width / 2 + ',' + height / 2 + ')');
+	console.log('svg',)
+let circleDragmove = function(d) {
+	// console.log('d',d); // 这个d是data哦
+	let circle =d3.select(this);
+	coord = [+circle.attr('cx'),+circle.attr('cy')];
+	coord[0] += d3.event.dx;
+	coord[1] += d3.event.dy;
+	circle.attr('cx',coord[0]);
+	circle.attr('cy',coord[1]);
+	// d3.select(this).attr('transform',`translate(${d.?}`)
+}
+let circleDragend = function(d) {
+	let circle = d3.select(this);
+	coord = [+circle.attr('cx'),+circle.attr('cy')];
+	if(coord[0] * coord[0] + coord[1] * coord[1] < outerRadius * outerRadius) {
+		// console.log('进去了');
+		data2.push(d);
+		circle.remove();
+		update(data2);
+	}
+}
+let circleDrag = d3.drag()
+				.on('drag',circleDragmove)
+				.on('end',circleDragend);
+
+let appendNewCircle = function(data,x,y) {
+	svg.append('circle').datum(data)
+		.attr('class','movedArc')
+		.attr('r',30)
+		.attr('cx',x) // 这样写应该不对
+		.attr('cy',y)
+		// .attr('cx',0)
+		// .attr('cy',0)
+		.attr('fill','red')
+		.call(circleDrag)
+}
+ 
+let dragmove = function(d){
+	d.ddx += d3.event.dx;
+	d.ddy += d3.event.dy;
+	d3.select(this).attr('transform','translate(' + d.ddx + ',' + d.ddy + ')');
+}
+let dragend = function(d,i) {
+	let dist = d.ddx * d.ddx + d.ddy * d.ddy;
+	if(dist > d.dr * d.dr){
+		let movedData = data2.splice(i, 1);
+		appendNewCircle(movedData,d.ddx,d.ddy);
+		update(data2);
+	}
+}
+let drag = d3.drag()
+	.on('drag',dragmove)
+	.on('end',dragend);
+
+
+let update = function(data){
+	let t = d3.transition()
+		.duration(2000);
+	let piedata = pie(data2);
+	let dountChart = svg.selectAll('.arc')
+	.data(piedata,(d,i)=>{
+		return d.data;
+	})
+
+	let exitPart = dountChart.exit() // 删除exit()部分
+		.remove()
+
+	let enterPart = dountChart.enter() // 为enter()部分添加g
+	//.transition(t)
+	.append('g')
+	.each((d) => {
+		d.ddx = 0;
+		d.ddy = 0;
+		d.dr = outerRadius;
+	})
+	.attr('class','arc')
+
+	enterPart.insert('path') // 这里用insert代替append试试 还没用过..
+	.attr('d',function(d){
+		this._current = d;
+		return arc(d)
+	})
+	.attr('class','path')
+	.style('fill',(d,i) => color(i))
+
+	enterPart.call(drag);    
+
+	dountChart.select('path')	
+		.transition().duration(2000)
+		.attrTween("d", function(d) {
+			//this._current = this._current || d;
+			var interpolate = d3.interpolate(this._current, d);
+			this._current = d;
+			return function(t) {
+				//console.log('inter',interpolate(t))
+				return arc(interpolate(t));
+			};
+		})
+		.style('fill',(d,i) => color(i))
+		.each(function(d,i){ // 为什么update部分要重新绑定属性呢？如果不绑定会报错
+		 d.ddx = 0;
+		 d.ddy = 0;
+		 d.dr = outerRadius;
+		})
+	dountChart.call(drag); //这个重新call很关键啊
+}
+
+update(data2);
+
+</script>
+</body>
